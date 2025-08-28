@@ -23,6 +23,18 @@ function vanterra_forms_activate() {
 }
 register_activation_hook( __FILE__, 'vanterra_forms_activate' );
 
+// Create GF form on plugin activation if GF is available
+function vanterra_forms_on_activate_deferred() {
+    if ( ! class_exists( 'GFAPI' ) ) {
+        return;
+    }
+    if ( function_exists( 'vanterra_forms_maybe_create_gf_form' ) ) {
+        vanterra_forms_maybe_create_gf_form();
+    }
+}
+// Run late on init to ensure GF loaded when activation occurs
+add_action( 'init', 'vanterra_forms_on_activate_deferred', 20 );
+
 // Add Settings link on the Plugins page
 function vanterra_forms_action_links( $links ) {
     $settings_url = admin_url( 'options-general.php?page=vanterra-forms' );
@@ -37,5 +49,8 @@ if ( file_exists( VANTERRA_FORMS_INC_DIR . 'admin.php' ) ) {
 }
 if ( file_exists( VANTERRA_FORMS_INC_DIR . 'attribution.php' ) ) {
     require_once VANTERRA_FORMS_INC_DIR . 'attribution.php';
+}
+if ( file_exists( VANTERRA_FORMS_INC_DIR . 'gf.php' ) ) {
+    require_once VANTERRA_FORMS_INC_DIR . 'gf.php';
 }
 
