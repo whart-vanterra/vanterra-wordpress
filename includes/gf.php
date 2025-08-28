@@ -3,6 +3,17 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
+function vanterra_forms_get_registry() {
+    $reg = get_option( 'vanterra_forms_registry', array() );
+    return is_array( $reg ) ? $reg : array();
+}
+
+function vanterra_forms_set_registry( $registry ) {
+    if ( is_array( $registry ) ) {
+        update_option( 'vanterra_forms_registry', $registry );
+    }
+}
+
 function vanterra_forms_get_attribution_keys() {
     $tracking_params = array(
         'utm_source','utm_medium','utm_campaign','utm_content','utm_term','utm_adgroup',
@@ -29,10 +40,15 @@ function vanterra_forms_maybe_create_gf_form() {
         return; // Gravity Forms not active
     }
 
-    $existing_id = (int) get_option( 'vanterra_forms_gf_form_id', 0 );
+    $registry = vanterra_forms_get_registry();
+    $target_title = 'Vanterra Attribution Form';
+    $schema_version = 1;
+    $existing_id = isset( $registry['attribution']['form_id'] ) ? (int) $registry['attribution']['form_id'] : (int) get_option( 'vanterra_forms_gf_form_id', 0 );
     if ( $existing_id > 0 ) {
         $form = GFAPI::get_form( $existing_id );
         if ( $form && ! is_wp_error( $form ) ) {
+            $registry['attribution'] = array( 'form_id' => (int) $existing_id, 'version' => $schema_version );
+            vanterra_forms_set_registry( $registry );
             return; // already created
         }
     }
@@ -43,6 +59,8 @@ function vanterra_forms_maybe_create_gf_form() {
     foreach ( $forms as $f ) {
         if ( isset($f['title']) && $f['title'] === $target_title ) {
             update_option( 'vanterra_forms_gf_form_id', (int) $f['id'] );
+            $registry['attribution'] = array( 'form_id' => (int) $f['id'], 'version' => $schema_version );
+            vanterra_forms_set_registry( $registry );
             return;
         }
     }
@@ -139,13 +157,17 @@ function vanterra_forms_maybe_create_gf_form() {
     $result = GFAPI::add_form( $form );
     if ( ! is_wp_error( $result ) && $result ) {
         update_option( 'vanterra_forms_gf_form_id', (int) $result );
+        $registry['attribution'] = array( 'form_id' => (int) $result, 'version' => $schema_version );
+        vanterra_forms_set_registry( $registry );
     }
 }
 
 // Render shortcode for the known form without hardcoding numeric ID
-function vanterra_forms_shortcode_form() {
+function vanterra_forms_shortcode_form( $atts = array() ) {
     if ( ! class_exists( 'GFAPI' ) ) return '';
-    $form_id = (int) get_option( 'vanterra_forms_gf_form_id', 0 );
+    $atts = shortcode_atts( array( 'slug' => 'attribution' ), $atts, 'vanterra_form' );
+    $registry = vanterra_forms_get_registry();
+    $form_id = isset( $registry[ $atts['slug'] ]['form_id'] ) ? (int) $registry[ $atts['slug'] ]['form_id'] : (int) get_option( 'vanterra_forms_gf_form_id', 0 );
     if ( ! $form_id ) return '';
     if ( function_exists( 'gravity_form' ) ) {
         ob_start();
@@ -162,8 +184,34 @@ function vanterra_forms_gform_after_submission( $entry, $form ) {
     $url     = trim( get_option( 'vanterra_forms_webhook_url', '' ) );
     if ( ! $enabled || empty( $url ) ) return;
 
-    $target_id = (int) get_option( 'vanterra_forms_gf_form_id', 0 );
+    $registry = vanterra_forms_get_registry();
+    $target_id = isset( $registry['attribution']['form_id'] ) ? (int) $registry['attribution']['form_id'] : (int) get_option( 'vanterra_forms_gf_form_id', 0 );
     if ( ! $target_id || (int) rgar( $form, 'id' ) !== $target_id ) return;
+
+    // Build normalized map keyed by inputName (and parts for composites)
+    $normalized = array();
+    if ( is_array( rgar( $form, 'fields' ) ) ) {
+        foreach ( $form['fields'] as $field ) {
+            $type = isset( $field->type ) ? $field->type : ( isset( $field['type'] ) ? $field['type'] : '' );
+            $inputName = isset( $field->inputName ) ? $field->inputName : ( isset( $field['inputName'] ) ? $field['inputName'] : '' );
+            $id = isset( $field->id ) ? $field->id : ( isset( $field['id'] ) ? $field['id'] : null );
+            if ( ! $id ) continue;
+
+            if ( $type === 'name' ) {
+                $normalized['name_first'] = rgar( $entry, (string) ( $id . '.3' ) );
+                $normalized['name_last']  = rgar( $entry, (string) ( $id . '.6' ) );
+            } else if ( $type === 'address' ) {
+                $normalized['address_line1']   = rgar( $entry, (string) ( $id . '.1' ) );
+                $normalized['address_line2']   = rgar( $entry, (string) ( $id . '.2' ) );
+                $normalized['address_city']    = rgar( $entry, (string) ( $id . '.3' ) );
+                $normalized['address_state']   = rgar( $entry, (string) ( $id . '.4' ) );
+                $normalized['address_zip']     = rgar( $entry, (string) ( $id . '.5' ) );
+                $normalized['address_country'] = rgar( $entry, (string) ( $id . '.6' ) );
+            } else if ( $inputName ) {
+                $normalized[ $inputName ] = rgar( $entry, (string) $id );
+            }
+        }
+    }
 
     $payload = array(
         'form_id' => (int) rgar( $form, 'id' ),
@@ -171,6 +219,7 @@ function vanterra_forms_gform_after_submission( $entry, $form ) {
         'entry_id' => (int) rgar( $entry, 'id' ),
         'submitted_at' => current_time( 'mysql', true ),
         'fields' => $entry,
+        'normalized' => $normalized,
     );
 
     wp_remote_post( $url, array(
