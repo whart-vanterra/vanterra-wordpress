@@ -105,4 +105,19 @@ function vanterra_forms_shortcode_attribution_test() {
 }
 add_shortcode( 'vanterra_attribution_test', 'vanterra_forms_shortcode_attribution_test' );
 
+/**
+ * Enhance Gravity Forms hidden fields to expose a data attribute for JS population.
+ * Adds data-vt-name="{inputName}" to hidden inputs that have an inputName.
+ */
+function vanterra_forms_gform_field_content( $content, $field, $value, $lead_id, $form_id ) {
+    if ( isset( $field->type ) && $field->type === 'hidden' && ! empty( $field->inputName ) ) {
+        // Inject data-vt-name before the closing bracket of the input tag
+        $attr = ' data-vt-name="' . esc_attr( $field->inputName ) . '" class="vt-attr-field"';
+        $content = preg_replace( '/<input(\s[^>]*?)\/>/i', '<input$1' . $attr . ' />', $content, 1 );
+        $content = preg_replace( '/<input(\s[^>]*?)>/', '<input$1' . $attr . '>', $content, 1 );
+    }
+    return $content;
+}
+add_filter( 'gform_field_content', 'vanterra_forms_gform_field_content', 10, 5 );
+
 

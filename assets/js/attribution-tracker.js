@@ -251,10 +251,13 @@
             const attributionData = this.getAllAttributionData();
             
             Object.keys(attributionData).forEach(key => {
-                const input = formElement.querySelector(`input[name="${key}"]`);
-                if (input && input.type === 'hidden') {
+                // Match by name
+                let inputs = Array.from(formElement.querySelectorAll(`input[type="hidden"][name="${key}"]`));
+                // Match by data attribute (for Gravity Forms hidden fields with inputName)
+                inputs = inputs.concat(Array.from(formElement.querySelectorAll(`input[type="hidden"][data-vt-name="${key}"]`)));
+                inputs.forEach(input => {
                     input.value = attributionData[key];
-                }
+                });
             });
         },
 
