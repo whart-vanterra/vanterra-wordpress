@@ -105,6 +105,108 @@
             return null;
         },
 
+        getMeasurementIdsFromEnvironment() {
+            const ids = new Set();
+            // From cookies named _ga_XXXXXXXX
+            document.cookie.split(';').map(c => c.trim()).forEach(c => {
+                const name = c.split('=')[0] || '';
+                if (name.startsWith('_ga_')) {
+                    const suffix = name.substring(4);
+                    // GA4 measurement IDs typically start with G-
+                    if (suffix && suffix.length >= 8) {
+                        // Try to reconstruct common GA4 ID formats
+                        if (suffix.startsWith('G-')) ids.add(suffix);
+                    }
+                }
+            });
+            // From dataLayer config commands
+            if (Array.isArray(window.dataLayer)) {
+                window.dataLayer.forEach(entry => {
+                    if (Array.isArray(entry) && entry[0] === 'config' && typeof entry[1] === 'string') {
+                        ids.add(entry[1]);
+                    } else if (entry && typeof entry === 'object' && entry.event === 'gtm.js' && entry['gtm.uniqueEventId']) {
+                        // skip
+                    }
+                });
+            }
+            return Array.from(ids);
+        },
+
+        tryFetchGaClientIdViaGtag(callback) {
+            if (typeof window.gtag !== 'function') {
+                callback(null);
+                return;
+            }
+            const ids = this.getMeasurementIdsFromEnvironment();
+            if (!ids.length) {
+                // Try a generic get which some wrappers support
+                try {
+                    window.gtag('get', null, 'client_id', cid => callback(cid || null));
+                } catch (e) {
+                    callback(null);
+                }
+                return;
+            }
+            let done = false;
+            const finish = (cid) => { if (!done) { done = true; callback(cid || null); } };
+            // Query the first available ID; if it fails, try next
+            const next = (index) => {
+                if (index >= ids.length) return finish(null);
+                try {
+                    window.gtag('get', ids[index], 'client_id', cid => {
+                        if (cid) return finish(cid);
+                        next(index + 1);
+                    });
+                } catch (e) {
+                    next(index + 1);
+                }
+            };
+            next(0);
+        },
+
+        enrichGaClientIdAsync() {
+            // If we already have last_ga_client_id cookie, skip
+            const existingLast = this.getCookie(this.cookiePrefix + 'last_ga_client_id');
+            if (existingLast) return;
+
+            // If cookie parsing already provided a value on this pageview, skip
+            const fromCookiesNow = this.getGaClientIdFromCookies();
+            if (fromCookiesNow) return;
+
+            // Attempt polling via gtag after GA initializes
+            let attempts = 0;
+            const maxAttempts = 20; // ~10s total if interval 500ms
+            const intervalMs = 500;
+            const poll = () => {
+                attempts++;
+                this.tryFetchGaClientIdViaGtag((cid) => {
+                    if (cid) {
+                        // Write last-touch cookie immediately
+                        this.setCookie(this.cookiePrefix + 'last_ga_client_id', cid, this.lastTouchExpiry);
+                        // If first-touch GA client id not captured yet, set it now
+                        if (!this.getCookie(this.cookiePrefix + 'first_ga_client_id')) {
+                            this.setCookie(this.cookiePrefix + 'first_ga_client_id', cid, this.firstTouchExpiry);
+                        }
+                        // Update session snapshot and repopulate forms
+                        const lastSnapRaw = this.tryGetSessionStorage(this.cookiePrefix + 'last_snapshot');
+                        let lastSnap = {};
+                        try { lastSnap = lastSnapRaw ? JSON.parse(lastSnapRaw) : {}; } catch (e) {}
+                        lastSnap.ga_client_id = cid;
+                        this.trySetSessionStorage(this.cookiePrefix + 'last_snapshot', JSON.stringify(lastSnap));
+
+                        // Repopulate forms
+                        const forms = document.querySelectorAll('form');
+                        forms.forEach(form => this.populateHiddenFields(form));
+                        return;
+                    }
+                    if (attempts < maxAttempts) {
+                        setTimeout(poll, intervalMs);
+                    }
+                });
+            };
+            poll();
+        },
+
         getOrCreateSessionId() {
             let sid = this.tryGetSessionStorage(this.cookiePrefix + 'session_id');
             if (!sid) {
@@ -292,6 +394,7 @@
             this.trackFirstTouch();
             this.trackLastTouch();
             this.observeForms();
+            this.enrichGaClientIdAsync();
         }
     };
 
