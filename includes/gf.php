@@ -195,8 +195,8 @@ function vanterra_forms_gform_after_submission( $entry, $form ) {
             if ( ! $id ) continue;
 
             if ( $type === 'name' ) {
-                $normalized['name_first'] = rgar( $entry, (string) ( $id . '.3' ) );
-                $normalized['name_last']  = rgar( $entry, (string) ( $id . '.6' ) );
+                $normalized['first_name'] = rgar( $entry, (string) ( $id . '.3' ) );
+                $normalized['last_name']  = rgar( $entry, (string) ( $id . '.6' ) );
             } else if ( $type === 'address' ) {
                 $normalized['address_line1']   = rgar( $entry, (string) ( $id . '.1' ) );
                 $normalized['address_line2']   = rgar( $entry, (string) ( $id . '.2' ) );
