@@ -55,6 +55,7 @@ function vanterra_forms_maybe_create_gf_form() {
             'type'   => 'name',
             'label'  => 'Name',
             'required' => true,
+            'inputName' => 'name',
             'inputs' => array(
                 array( 'id' => 1.3, 'label' => 'First' ),
                 array( 'id' => 1.6, 'label' => 'Last' ),
@@ -66,6 +67,7 @@ function vanterra_forms_maybe_create_gf_form() {
             'type'     => 'email',
             'label'    => 'Email',
             'required' => true,
+            'inputName' => 'email',
         ),
         // Phone
         array(
@@ -74,6 +76,7 @@ function vanterra_forms_maybe_create_gf_form() {
             'label'       => 'Phone',
             'required'    => true,
             'phoneFormat' => 'standard',
+            'inputName'   => 'phone',
         ),
         // Address (composite)
         array(
@@ -82,6 +85,7 @@ function vanterra_forms_maybe_create_gf_form() {
             'label'       => 'Address',
             'required'    => true,
             'addressType' => 'us',
+            'inputName'   => 'address',
             'inputs' => [
                 [ 'id' => 4.1, 'label' => 'Street Address' ],
                 [ 'id' => 4.2, 'label' => 'Address Line 2' ],
@@ -103,6 +107,7 @@ function vanterra_forms_maybe_create_gf_form() {
                 array( 'text' => 'Crawl Space Encapsulation', 'value' => 'crawl_space' ),
                 array( 'text' => 'Concrete Lifting',       'value' => 'concrete_lifting' ),
             ),
+            'inputName' => 'service',
         ),
         // Comment
         array(
@@ -111,6 +116,7 @@ function vanterra_forms_maybe_create_gf_form() {
             'label'       => 'Tell us about your issue',
             'required'    => false,
             'placeholder' => "Briefly describe what you're seeing…",
+            'inputName'   => 'comment',
         ),
     );
 
@@ -135,5 +141,44 @@ function vanterra_forms_maybe_create_gf_form() {
         update_option( 'vanterra_forms_gf_form_id', (int) $result );
     }
 }
+
+// Render shortcode for the known form without hardcoding numeric ID
+function vanterra_forms_shortcode_form() {
+    if ( ! class_exists( 'GFAPI' ) ) return '';
+    $form_id = (int) get_option( 'vanterra_forms_gf_form_id', 0 );
+    if ( ! $form_id ) return '';
+    if ( function_exists( 'gravity_form' ) ) {
+        ob_start();
+        gravity_form( $form_id, false, false, false, null, true, 1 );
+        return ob_get_clean();
+    }
+    return '';
+}
+add_shortcode( 'vanterra_form', 'vanterra_forms_shortcode_form' );
+
+// Send webhook on submission (only for our form)
+function vanterra_forms_gform_after_submission( $entry, $form ) {
+    $enabled = (int) get_option( 'vanterra_forms_webhook_enabled', 0 );
+    $url     = trim( get_option( 'vanterra_forms_webhook_url', '' ) );
+    if ( ! $enabled || empty( $url ) ) return;
+
+    $target_id = (int) get_option( 'vanterra_forms_gf_form_id', 0 );
+    if ( ! $target_id || (int) rgar( $form, 'id' ) !== $target_id ) return;
+
+    $payload = array(
+        'form_id' => (int) rgar( $form, 'id' ),
+        'form_title' => rgar( $form, 'title' ),
+        'entry_id' => (int) rgar( $entry, 'id' ),
+        'submitted_at' => current_time( 'mysql', true ),
+        'fields' => $entry,
+    );
+
+    wp_remote_post( $url, array(
+        'timeout' => 8,
+        'headers' => array('Content-Type' => 'application/json'),
+        'body'    => wp_json_encode( $payload ),
+    ) );
+}
+add_action( 'gform_after_submission', 'vanterra_forms_gform_after_submission', 10, 2 );
 
 
