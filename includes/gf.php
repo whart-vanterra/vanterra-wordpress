@@ -97,7 +97,7 @@ function vanterra_forms_get_schemas()
         'phone' => array(
             'id' => 3,
             'type' => 'phone',
-            'label' => 'Phone',
+            'label' => 'Mobile Phone',
             'required' => true,
             'inputName' => 'phone',
             'phoneFormat' => 'standard',
@@ -118,7 +118,7 @@ function vanterra_forms_get_schemas()
                 array('id' => '4.2', 'label' => 'Address 2', 'autocompleteAttribute' => 'address-line2', 'isHidden' => true),
                 array('id' => '4.3', 'label' => 'City', 'autocompleteAttribute' => 'address-level2'),
                 array('id' => '4.4', 'label' => 'State', 'autocompleteAttribute' => 'address-level1'),
-                array('id' => '4.5', 'label' => 'ZIP', 'autocompleteAttribute' => 'postal-code'),
+                array('id' => '4.5', 'label' => 'Zip Code', 'autocompleteAttribute' => 'postal-code'),
                 array('id' => '4.6', 'label' => 'Country', 'autocompleteAttribute' => 'country-name', 'isHidden' => true)
             )
         ),
@@ -366,12 +366,12 @@ function vanterra_forms_gform_after_submission($entry, $form)
                 $normalized['first_name'] = rgar($entry, (string) ($id . '.3'));
                 $normalized['last_name']  = rgar($entry, (string) ($id . '.6'));
             } else if ($type === 'address') {
-                $normalized['address_line1']   = rgar($entry, (string) ($id . '.1'));
-                $normalized['address_line2']   = rgar($entry, (string) ($id . '.2'));
-                $normalized['address_city']    = rgar($entry, (string) ($id . '.3'));
-                $normalized['address_state']   = rgar($entry, (string) ($id . '.4'));
-                $normalized['address_zip']     = rgar($entry, (string) ($id . '.5'));
-                $normalized['address_country'] = rgar($entry, (string) ($id . '.6'));
+                $normalized['address_1']   = rgar($entry, (string) ($id . '.1'));
+                $normalized['address_2']   = rgar($entry, (string) ($id . '.2'));
+                $normalized['city']    = rgar($entry, (string) ($id . '.3'));
+                $normalized['state']   = rgar($entry, (string) ($id . '.4'));
+                $normalized['zip_code']     = rgar($entry, (string) ($id . '.5'));
+                $normalized['country'] = rgar($entry, (string) ($id . '.6'));
             } else if ($inputName) {
                 $normalized[$inputName] = rgar($entry, (string) $id);
             }
@@ -383,6 +383,7 @@ function vanterra_forms_gform_after_submission($entry, $form)
         'form_title' => rgar($form, 'title'),
         'entry_id' => (int) rgar($entry, 'id'),
         'submitted_at' => current_time('mysql', true),
+        'domain' => home_url(),
         'fields' => $entry,
         'normalized' => $normalized,
     );
@@ -395,17 +396,28 @@ function vanterra_forms_gform_after_submission($entry, $form)
 }
 add_action('gform_after_submission', 'vanterra_forms_gform_after_submission', 10, 2);
 
+// Add GPAA filter for trimming zip codes to 5 digits
+function vanterra_forms_enqueue_gpaa_filter()
+{
+    if (is_admin()) return;
+    
+    // Only load if Gravity Forms is active and we have our forms
+    if (!class_exists('GFAPI')) return;
+    
+    $registry = vanterra_forms_get_registry();
+    if (empty($registry)) return;
+    
+    wp_add_inline_script('gform_gravityforms', "
+        if (typeof gform !== 'undefined' && gform.addFilter) {
+            gform.addFilter('gpaa_values', function(values, place) {
+                if (values.postcode) {
+                    values.postcode = values.postcode.split('-')[0];
+                }
+                return values;
+            });
+        }
+    ");
+}
+add_action('wp_enqueue_scripts', 'vanterra_forms_enqueue_gpaa_filter', 15);
 
-/**
- * Gravity Perks // Address Autocomplete // Trim US Zip Codes to First 5 Digits
- * https://gravitywiz.com/documentation/gravity-forms-address-autocomplete/
- *
- * Instructions:
- *
- * 1. Install this snippet with our free Custom JavaScript plugin.
- *    https://gravitywiz.com/gravity-forms-code-chest/
- */
-// gform.addFilter( 'gpaa_values', function( values, place ) {
-// 	values.postcode = values.postcode.split( '-' )[0];
-// 	return values;
-// } );
+
