@@ -148,7 +148,7 @@ function vanterra_forms_get_schemas()
         'turnstile' => array(
             'id' => 7,
             'type' => 'turnstile',
-            'label' => 'Verify you are a human', 
+            'label' => 'Verify you are a human',
             'displayOnly' => true,
         ),
         'email_optional' => array(
@@ -181,30 +181,36 @@ function vanterra_forms_get_schemas()
                     $enhanced_fields['message'],
                     $enhanced_fields['turnstile'],
                 ),
-                $hidden  
+                $hidden
             ),
         ),
         'lead_short' => array(
             'slug' => 'lead_short',
             'version' => 2,
             'title' => 'Vanterra Short Lead Form',
-            'fields' => array_merge(array(
-                $enhanced_fields['name'],
-                $enhanced_fields['phone'],
-                $enhanced_fields['email'],
-                $enhanced_fields['service'],
-                $enhanced_fields['turnstile'],
-            ), $hidden),
+            'fields' => array_merge(
+                array(
+                    $enhanced_fields['name'],
+                    $enhanced_fields['phone'],
+                    $enhanced_fields['email'],
+                    $enhanced_fields['service'],
+                    $enhanced_fields['turnstile'],
+                ),
+                $hidden
+            ),
         ),
         'lead_sms' => array(
             'slug' => 'lead_sms',
             'version' => 2,
             'title' => 'Vanterra SMS Lead Form',
-            'fields' => array_merge(array(
-                $enhanced_fields['phone'], 
-                $enhanced_fields['message'],
-                $enhanced_fields['turnstile'],
-            ), $hidden),
+            'fields' => array_merge(
+                array(
+                    $enhanced_fields['phone'],
+                    $enhanced_fields['message'],
+                    $enhanced_fields['turnstile'],
+                ),
+                $hidden
+            ),
         ),
 
 
@@ -242,15 +248,16 @@ function vanterra_forms_get_schemas()
                     $enhanced_fields['service'],
                     $enhanced_fields['message'],
                     $enhanced_fields['turnstile'],
-                    $hidden,
+
                 ),
+                $hidden
             ),
             'pagination' => array(
                 'type' => 'steps',
                 'pages' => array('Address', 'Contact', 'Message'),
                 'gp-multi-page-navigation_enable' => true,
                 'gp-multi-page-navigation_activation_type' => 'progression'
-            ), 
+            ),
             'lastPageButton' => array(
                 'type' => 'text',
                 'text' => 'Previous',
