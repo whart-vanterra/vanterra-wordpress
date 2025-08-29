@@ -145,6 +145,12 @@ function vanterra_forms_get_schemas()
             'placeholder' => "Briefly describe what you're seeing…",
             'useRichTextEditor' => false,
         ),
+        'turnstile' => array(
+            'id' => 7,
+            'type' => 'turnstile',
+            'label' => 'Verify you are a human', 
+            'displayOnly' => true,
+        ),
         'email_optional' => array(
             'id' => 2,
             'type' => 'email',
@@ -162,14 +168,21 @@ function vanterra_forms_get_schemas()
         $enhanced_fields['phone'],
     );
 
-
-
     $schemas = array(
         'lead_full' => array(
             'slug' => 'lead_full',
             'version' => 2,
             'title' => 'Vanterra Lead Form',
-            'fields' => array_merge($base_contact, array($enhanced_fields['address'], $enhanced_fields['service'], $enhanced_fields['message']), $hidden),
+            'fields' => array_merge(
+                $base_contact,
+                array(
+                    $enhanced_fields['address'],
+                    $enhanced_fields['service'],
+                    $enhanced_fields['message'],
+                    $enhanced_fields['turnstile'],
+                ),
+                $hidden  
+            ),
         ),
         'lead_short' => array(
             'slug' => 'lead_short',
@@ -180,6 +193,7 @@ function vanterra_forms_get_schemas()
                 $enhanced_fields['phone'],
                 $enhanced_fields['email'],
                 $enhanced_fields['service'],
+                $enhanced_fields['turnstile'],
             ), $hidden),
         ),
         'lead_sms' => array(
@@ -187,9 +201,9 @@ function vanterra_forms_get_schemas()
             'version' => 2,
             'title' => 'Vanterra SMS Lead Form',
             'fields' => array_merge(array(
-                $enhanced_fields['phone'],
-                $enhanced_fields['email_optional'],
-                $enhanced_fields['message']
+                $enhanced_fields['phone'], 
+                $enhanced_fields['message'],
+                $enhanced_fields['turnstile'],
             ), $hidden),
         ),
 
@@ -204,50 +218,39 @@ function vanterra_forms_get_schemas()
                     $enhanced_fields['address'],
                     // Page 2: Contact
                     array(
-                        'id' => 8,
+                        'id' => 88,
                         'type' => 'page',
                         'title' => 'Contact',
                         'displayOnly' => true,
-                        'nextButton' => array('type' => 'text', 'text' => 'Next', 'imageUrl' => '', 'id' => 8),
+                        'nextButton' => array('type' => 'text', 'text' => 'Next', 'imageUrl' => '', 'id' => 88),
                         'previousButton' => array('type' => 'text', 'text' => 'Previous', 'imageUrl' => ''),
-                        'layoutGroupId' => 'page8'
+                        'layoutGroupId' => 'page88'
                     ),
                     $enhanced_fields['name'],
                     $enhanced_fields['phone'],
                     $enhanced_fields['email'],
                     // Page 3: Message
                     array(
-                        'id' => 8,
+                        'id' => 99,
                         'type' => 'page',
                         'title' => 'Message',
                         'displayOnly' => true,
-                        'nextButton' => array('type' => 'text', 'text' => 'Next', 'imageUrl' => '', 'id' => 8),
+                        'nextButton' => array('type' => 'text', 'text' => 'Next', 'imageUrl' => '', 'id' => 99),
                         'previousButton' => array('type' => 'text', 'text' => 'Previous', 'imageUrl' => ''),
-                        'layoutGroupId' => 'page8'
+                        'layoutGroupId' => 'page89'
                     ),
+                    $enhanced_fields['service'],
                     $enhanced_fields['message'],
+                    $enhanced_fields['turnstile'],
                     $hidden,
                 ),
             ),
             'pagination' => array(
                 'type' => 'steps',
                 'pages' => array('Address', 'Contact', 'Message'),
-                'backgroundColor' => null,
-                'color' => null,
-                'display_progressbar_on_confirmation' => null,
-                'progressbar_completion_text' => null,
                 'gp-multi-page-navigation_enable' => true,
                 'gp-multi-page-navigation_activation_type' => 'progression'
-            ),
-            'button' => array(
-                'type' => 'text',
-                'text' => 'Submit',
-                'imageUrl' => '',
-                'width' => 'auto',
-                'location' => 'bottom',
-                'layoutGridColumnSpan' => 12,
-                'id' => 'submit'
-            ),
+            ), 
             'lastPageButton' => array(
                 'type' => 'text',
                 'text' => 'Previous',
